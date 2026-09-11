@@ -1,0 +1,21 @@
+import { ArrowRight, CalendarDays, Heart, PawPrint, Plus, Stethoscope } from 'lucide-react'
+import { Link } from 'react-router-dom'
+import { Badge, EmptyState, ErrorState, Loading, PageHeader, PetIcon, petPhoto } from '../components/ui'
+import { dateTime } from '../lib/format'
+import { useAppointments, useMe, usePets } from '../lib/queries'
+
+export function Dashboard() {
+  const me = useMe()
+  const pets = usePets()
+  const appointments = useAppointments()
+  if (pets.isPending || appointments.isPending) return <Loading />
+  if (pets.isError || appointments.isError) return <ErrorState error={pets.error ?? appointments.error} retry={() => { void pets.refetch(); void appointments.refetch() }} />
+  const upcoming = appointments.data.filter(a => a.status === 'Pendiente' && new Date(a.starts_at).getTime() > Date.now()).sort((a, b) => a.starts_at.localeCompare(b.starts_at))
+  return <><PageHeader eyebrow="CADA DÍA, UN POCO MÁS DE CUIDADO" title={`Hola, ${me.data?.profile.first_name ?? ''} 👋`} description="Todo lo que necesitas para acompañar a tus mascotas." action={<Link className="button" to="/app/citas/nueva"><Plus size={18} />Solicitar cita</Link>} />
+    <section className="welcome-banner"><div><span className="banner-tag"><Heart size={15} /> SIEMPRE A SU LADO</span><h2>Pequeños cuidados.<br />Grandes momentos juntos.</h2><p>Su bienestar empieza con una atención a tiempo.</p><Link className="button lime small" to="/app/veterinarias">Encuentra una veterinaria <ArrowRight size={17} /></Link></div><img src={petPhoto} alt="Un gato y un perro disfrutan juntos del jardín" /></section>
+    <div className="stats-grid"><article className="stat-card"><span className="stat-icon teal"><PawPrint /></span><div><span>Mis mascotas</span><strong>{pets.data.length.toString().padStart(2, '0')}</strong></div><Link to="/app/mascotas" aria-label="Ver mis mascotas"><ArrowRight size={20} /></Link></article><article className="stat-card"><span className="stat-icon amber"><CalendarDays /></span><div><span>Próximas citas pendientes</span><strong>{upcoming.length.toString().padStart(2, '0')}</strong></div><Link to="/app/citas" aria-label="Ver mis citas"><ArrowRight size={20} /></Link></article><Link className="quick-card" to="/app/mascotas/nueva"><span className="stat-icon"><Plus /></span><div><strong>Un nuevo compañero</strong><span>Registra a tu mascota</span></div><ArrowRight size={20} /></Link></div>
+    <div className="dashboard-columns"><section className="panel"><div className="section-heading"><h2>Próximas citas</h2><Link to="/app/citas" className="text-link">Ver todas <ArrowRight size={16} /></Link></div>{upcoming.length ? <div className="appointment-rows">{upcoming.slice(0, 3).map(a => <Link className="appointment-row" key={a.id} to={`/app/citas/${a.id}`}><span className="pet-avatar"><PetIcon species={a.pet.species} size={25} /></span><div className="row-content"><strong>{a.service.name} · {a.pet.name}</strong><span>{a.clinic.name}</span><small>{dateTime(a.starts_at)}</small></div><Badge status={a.status} /></Link>)}</div> : <EmptyState title="Un espacio para su próximo cuidado" action={<Link className="button secondary small" to="/app/citas/nueva">Solicitar su primera cita</Link>}>Aquí verás tus próximas citas pendientes.</EmptyState>}</section>
+    <section className="panel"><div className="section-heading"><h2>Tu pequeña familia</h2><Link to="/app/mascotas" className="text-link">Ver todas <ArrowRight size={16} /></Link></div>{pets.data.length ? <div className="family-list">{pets.data.slice(0, 3).map(p => <Link key={p.id} className="family-row" to={`/app/mascotas/${p.id}`}><span className={`pet-avatar ${p.species === 'Gato' ? 'peach' : ''}`}><PetIcon species={p.species} /></span><div><strong>{p.name}</strong><span>{p.species} · {p.breed}</span></div><ArrowRight size={18} /></Link>)}</div> : <EmptyState title="Conozcamos a tu mascota" action={<Link className="button secondary small" to="/app/mascotas/nueva">Registrar mascota</Link>}>Su nombre es el comienzo de una historia de cuidado.</EmptyState>}</section></div>
+    <div className="catalog-note"><Stethoscope size={21} /><p>¿Buscas atención? Explora las veterinarias y sus servicios disponibles.</p><Link className="text-link" to="/app/veterinarias">Explorar catálogo <ArrowRight size={16} /></Link></div>
+  </>
+}

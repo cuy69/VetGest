@@ -1,0 +1,17 @@
+.env
+.env.*
+!.env.example
+.venv/
+.local/
+node_modules/
+.pnpm-store/
+dist/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.ruff_cache/
+.coverage
+test-results/
+playwright-report/
+.sites-runtime/
+*.log

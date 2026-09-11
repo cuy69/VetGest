@@ -1,0 +1,57 @@
+name: vetgest-e2e
+services:
+  db:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_DB: vetgest_e2e_test
+      POSTGRES_USER: vetgest_test
+      POSTGRES_PASSWORD: isolated-e2e-password
+    tmpfs:
+      - /var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U vetgest_test -d vetgest_e2e_test"]
+      interval: 2s
+      timeout: 5s
+      retries: 15
+  api:
+    build:
+      context: ./backend
+      target: base
+    environment:
+      POSTGRES_HOST: db
+      POSTGRES_DB: vetgest_e2e_test
+      POSTGRES_USER: vetgest_test
+      POSTGRES_PASSWORD: isolated-e2e-password
+      JWT_SECRET: isolated-e2e-secret-not-for-production-123456789
+      CORS_ORIGINS: '["http://web","http://localhost:8081"]'
+    depends_on:
+      db:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/api/health')"]
+      interval: 3s
+      timeout: 5s
+      retries: 15
+  web:
+    build:
+      context: ./frontend
+      target: production
+    ports:
+      - "127.0.0.1:8081:80"
+    depends_on:
+      api:
+        condition: service_healthy
+  e2e:
+    build:
+      context: ./frontend
+      target: e2e
+    init: true
+    shm_size: 1gb
+    environment:
+      E2E_BASE_URL: http://web
+    volumes:
+      - ./frontend/test-results:/app/test-results
+      - ./frontend/playwright-report:/app/playwright-report
+    depends_on:
+      web:
+        condition: service_started
