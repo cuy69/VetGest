@@ -1,0 +1,62 @@
+# Respaldo diario y cifrado de la base de datos (esquema public de Supabase).
+# Secretos del repositorio (Settings → Secrets and variables → Actions):
+#   BACKUP_DATABASE_URL  URL del Session pooler de Supabase (usuario dueño, puerto 5432)
+#   BACKUP_PASSPHRASE    frase larga para cifrar; guárdala fuera de GitHub (sin ella no se restaura)
+# Restaurar: scripts/restaurar-respaldo.sh. Procedimiento completo: docs/administracion-bd.md.
+name: Respaldo de base de datos
+
+on:
+  schedule:
+    - cron: "0 8 * * *" # 03:00 en Lima
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: respaldo-bd
+  cancel-in-progress: false
+
+jobs:
+  respaldo:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      DATABASE_URL: ${{ secrets.BACKUP_DATABASE_URL }}
+      BACKUP_PASSPHRASE: ${{ secrets.BACKUP_PASSPHRASE }}
+    steps:
+      - name: Comprobar configuración
+        id: config
+        run: |
+          if [ -z "$DATABASE_URL" ] || [ -z "$BACKUP_PASSPHRASE" ]; then
+            echo "::notice::Faltan BACKUP_DATABASE_URL o BACKUP_PASSPHRASE: respaldo omitido."
+            echo "ready=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "ready=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Volcar, verificar y cifrar
+        if: steps.config.outputs.ready == 'true'
+        run: |
+          set -euo pipefail
+          umask 077
+          name="vetgest-$(date -u +%Y%m%d-%H%M)"
+          echo "NAME=$name" >> "$GITHUB_ENV"
+          # pg_dump 17 (igual a la versión de Supabase). La URL va por variable, no como argumento.
+          docker run --rm -e DATABASE_URL="${DATABASE_URL/+psycopg/}" -v "$PWD:/out" -u "$(id -u)" postgres:17-alpine \
+            sh -c 'pg_dump "$DATABASE_URL" --schema=public --format=custom --no-owner --no-privileges --file="/out/'"$name"'.dump" \
+              && pg_restore --list "/out/'"$name"'.dump" > /dev/null'
+          printf '%s' "$BACKUP_PASSPHRASE" | gpg --batch --yes --pinentry-mode loopback --passphrase-fd 0 \
+            --symmetric --cipher-algo AES256 --output "$name.dump.gpg" "$name.dump"
+          sha256sum "$name.dump.gpg" > "$name.dump.gpg.sha256"
+          shred -u "$name.dump"
+          ls -l "$name".*
+
+      - name: Guardar respaldo (7 días)
+        if: steps.config.outputs.ready == 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ env.NAME }}
+          path: ${{ env.NAME }}.dump.gpg*
+          retention-days: 7
+          if-no-files-found: error
