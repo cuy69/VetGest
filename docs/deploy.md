@@ -69,5 +69,5 @@ Ver [`mobile/README.md`](../mobile/README.md).
 ## Limitaciones del plan gratuito
 
 - Render suspende la API tras ~15 minutos sin tráfico; la primera petición tarda ~1 minuto. Para una demostración, abre `/api/health` unos minutos antes.
-- Supabase pausa proyectos inactivos una semana. Haz copias de seguridad antes de cargar datos reales (Supabase → Database → Backups o `pg_dump`).
+- Supabase pausa proyectos inactivos una semana. Antes de cargar datos reales activa el respaldo diario cifrado y el usuario `vetgest_app` de permisos mínimos: [administracion-bd.md](administracion-bd.md). El respaldo diario también evita la pausa.
 - Vercel Hobby es para uso no comercial; para una veterinaria real que cobre por el servicio corresponde el plan Pro.

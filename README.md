@@ -6,7 +6,7 @@ Plataforma multi-clínica para la gestión y el cuidado de mascotas. Interfaz en
 - **Clínicas:** recepción (agenda, sala de espera y caja), veterinarios (consulta, atenciones, vacunas y tratamientos con descuento de inventario) y administrador (equipo, servicios, horario, inventario e ingresos).
 - **Administración VetGest:** alta y suspensión de clínicas, métricas.
 
-Perfiles y reglas: [docs/roles.md](docs/roles.md). Despliegue en Supabase + Render (API) + Vercel (web): [docs/deploy.md](docs/deploy.md). App móvil: [mobile/README.md](mobile/README.md).
+Perfiles y reglas: [docs/roles.md](docs/roles.md). Despliegue en Supabase + Render (API) + Vercel (web): [docs/deploy.md](docs/deploy.md). App móvil: [mobile/README.md](mobile/README.md). Administración de la base de datos (privilegios, respaldos, replicación): [docs/administracion-bd.md](docs/administracion-bd.md). Seguridad de la información (riesgos, controles, incidentes): [docs/seguridad.md](docs/seguridad.md).
 
 **Estado actual (05/11/2026):** backend (42 pruebas), web (51 pruebas, ESLint, TypeScript y build) y app Expo (27 pruebas) verificados; el recorrido completo se probó en el navegador contra la API real. Falta desplegar. Detalle en [el registro de verificación](docs/verification.md).
 
@@ -159,7 +159,7 @@ Es un monolito modular: una API y una base PostgreSQL. No hay microservicios ni 
 - El catálogo, direcciones, teléfonos y precios son **ficticios**. Las solicitudes no se envían a clínicas reales.
 - Permisos por rol verificados en el backend (`require_staff`, `require_owner`, `require_platform_admin`); la interfaz solo refleja esas reglas.
 - Fotos de mascotas, recuperación de contraseña, verificación de correo, notificaciones por correo/WhatsApp, pagos y mapas no forman parte de esta entrega. Ver riesgos en [docs/roles.md](docs/roles.md).
-- Para un despliegue público se requiere HTTPS, `COOKIE_SECURE=true`, dominio exacto en CORS, secretos nuevos, copias de seguridad y una revisión de seguridad. El sprint no incorpora limitación de intentos distribuida ni autenticación multifactor.
+- Para un despliegue público se requiere HTTPS, `COOKIE_SECURE=true`, dominio exacto en CORS, secretos nuevos, copias de seguridad y una revisión de seguridad. Hay límite de intentos de inicio de sesión (por proceso, no distribuido); no hay autenticación multifactor. Ver [docs/seguridad.md](docs/seguridad.md).
 
 Ver [decisiones del modelo](docs/architecture.md), [contratos REST](docs/api.md), [Sprint 1](docs/sprint-1.md) y [verificación real](docs/verification.md).
 
