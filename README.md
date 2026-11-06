@@ -1,8 +1,14 @@
-# VetGest · Sprint 1
+# VetGest
 
-Aplicación para propietarios de mascotas: registro, sesión, perfil, mascotas, catálogo de veterinarias y solicitudes de citas. Interfaz en español, importes en soles y citas en hora de Lima (UTC−5).
+Plataforma multi-clínica para la gestión y el cuidado de mascotas. Interfaz en español, importes en soles y citas en hora de Lima (UTC−5).
 
-**Estado actual:** implementación escrita; la verificación funcional sigue pendiente. No se pudo instalar las dependencias porque la descarga fue rechazada y no están disponibles sin conexión. Docker y PostgreSQL tampoco están instalados en el equipo de trabajo. Consulta [el registro de verificación](docs/verification.md) antes de considerar el sprint terminado.
+- **Propietarios (web y app móvil Expo):** mascotas, solicitud de turnos libres, estado de la cita en vivo, historial clínico y recordatorios de vacunas y controles.
+- **Clínicas:** recepción (agenda, sala de espera y caja), veterinarios (consulta, atenciones, vacunas y tratamientos con descuento de inventario) y administrador (equipo, servicios, horario, inventario e ingresos).
+- **Administración VetGest:** alta y suspensión de clínicas, métricas.
+
+Perfiles y reglas: [docs/roles.md](docs/roles.md). Despliegue en Supabase + Render (API) + Vercel (web): [docs/deploy.md](docs/deploy.md). App móvil: [mobile/README.md](mobile/README.md). Administración de la base de datos (privilegios, respaldos, replicación): [docs/administracion-bd.md](docs/administracion-bd.md). Seguridad de la información (riesgos, controles, incidentes): [docs/seguridad.md](docs/seguridad.md).
+
+**Estado actual (05/11/2026):** backend (42 pruebas), web (51 pruebas, ESLint, TypeScript y build) y app Expo (27 pruebas) verificados; el recorrido completo se probó en el navegador contra la API real. Falta desplegar. Detalle en [el registro de verificación](docs/verification.md).
 
 ## Ejecutar con Docker Compose
 
@@ -27,15 +33,17 @@ Requisitos: Docker Engine/Desktop con Compose v2, motor activo y acceso a Intern
    docker compose up --build
    ```
 
-4. Abre [VetGest](http://localhost:8080) y crea tu propia cuenta. Tras registrarte, inicia sesión. No existen usuarios ni contraseñas de demostración.
-5. La API ejecuta `alembic upgrade head` y `python -m app.seed` antes de arrancar. El seed es idempotente y carga tres veterinarias ficticias y doce servicios, sin sobrescribir registros existentes.
+4. Abre [VetGest](http://localhost:8080) y crea tu propia cuenta de propietario. No existen usuarios ni contraseñas de demostración.
+5. Para entrar como **administrador de plataforma**, define en `.env` `BOOTSTRAP_ADMIN_EMAIL` (dominio real, no `.local`) y `BOOTSTRAP_ADMIN_PASSWORD` (12+ caracteres) antes de arrancar. Desde ese perfil se dan de alta clínicas con su administrador, que a su vez crea veterinarios y recepcionistas. Toda contraseña temporal se cambia en el primer ingreso.
+6. La API ejecuta `alembic upgrade head` y `python -m app.seed` antes de arrancar. El seed es idempotente: carga tres veterinarias ficticias y doce servicios (desactívalo con `SEED_DEMO_CATALOG=false`) y crea el admin de arranque si no existe.
+7. Si tu red inspecciona TLS y bloquea `registry.npmjs.org` (error `UNABLE_TO_VERIFY_LEAF_SIGNATURE`), añade `NPM_REGISTRY=https://registry.yarnpkg.com/` a `.env`.
 
 - [Swagger](http://localhost:8080/api/docs): usa primero `POST /api/auth/login`; el navegador conserva la cookie para probar los endpoints privados. Los recursos de Swagger necesitan acceso a jsDelivr.
 - [Salud de la API y conexión a PostgreSQL](http://localhost:8080/api/health).
 - Detener conservando datos: `docker compose down`. El volumen `postgres_data` persiste los datos. No uses `down -v` si quieres conservarlos.
 - Los contenedores API y base de datos no publican puertos hacia el host. Las páginas utilizan `/api` a través de Nginx.
 
-El compose está preparado, pero **no se ha ejecutado en este entorno**. El frontend todavía no tiene lockfile porque no hubo una instalación exitosa. Se fijaron versiones directas; genera y versiona `frontend/pnpm-lock.yaml` tras la primera instalación y validación. El Dockerfile acepta ese lockfile cuando exista.
+El compose se ejecutó y validó el 9 de octubre de 2026 con Docker 29.8 y Compose 5.5. `frontend/pnpm-lock.yaml` está versionado y el Dockerfile instala con `--frozen-lockfile`.
 
 ## Desarrollo sin Docker
 
@@ -122,7 +130,7 @@ Ejecuta E2E contra una instalación de pruebas: crea cuentas con correos aleator
 ```text
 backend/
   app/core/          Configuración, conexión, hash y sesión JWT
-  app/domains/       Routers de autenticación, mascotas, catálogo y citas
+  app/domains/       Routers: auth, mascotas, catálogo, citas, clínica (personal) y admin
   app/models.py     Entidades SQLAlchemy
   app/schemas.py    Contratos y validaciones Pydantic
   app/seed.py       Catálogo ficticio idempotente
@@ -130,7 +138,7 @@ backend/
   tests/            Casos funcionales con PostgreSQL
 frontend/
   src/components/   Navegación, formularios y estados reutilizables
-  src/pages/        Pantallas reales del propietario
+  src/pages/        Propietario, clínica (Clinic*.tsx) y administración (Admin.tsx)
   src/lib/          Cliente HTTP, tipos, consultas y esquemas Zod
   src/test/         Vitest, Testing Library y flujo con contrato HTTP simulado
   e2e/              Playwright, API real, escritorio y móvil
@@ -147,10 +155,11 @@ Es un monolito modular: una API y una base PostgreSQL. No hay microservicios ni 
 - Cerrar sesión revoca **todas las sesiones de esa cuenta** incrementando la versión, además de eliminar la cookie. Es una decisión deliberada para este sprint.
 - Los formularios de escritura solo aceptan campos declarados. El backend deriva el propietario de la sesión y verifica la propiedad en cada acceso; responde 404 a recursos ajenos.
 - Mutaciones desde orígenes no permitidos o con `Sec-Fetch-Site: cross-site` se rechazan. CORS usa una lista explícita. Los clientes no navegador pueden omitir Origin, pero necesitan una cookie JWT válida para recursos privados.
-- Las consultas nuevas se guardan como `Pendiente`; el propietario puede cancelarlas. No se confirma disponibilidad, no se reservan cupos y no hay pagos. El horario de la clínica se muestra como información; no es un motor de disponibilidad.
+- Las citas nuevas se guardan como `Pendiente`; recepción las confirma, reprograma o cancela. No hay motor de disponibilidad ni pagos.
 - El catálogo, direcciones, teléfonos y precios son **ficticios**. Las solicitudes no se envían a clínicas reales.
-- Fotos de mascotas, historial clínico, vacunas, alertas, recuperación de contraseña, verificación de correo, administración, pagos, mapas y panel médico no forman parte de esta entrega. Se documentan en el backlog; no hay botones falsos.
-- Para un despliegue público se requiere HTTPS, `COOKIE_SECURE=true`, dominio exacto en CORS, secretos nuevos, copias de seguridad y una revisión de seguridad. El sprint no incorpora limitación de intentos distribuida ni autenticación multifactor.
+- Permisos por rol verificados en el backend (`require_staff`, `require_owner`, `require_platform_admin`); la interfaz solo refleja esas reglas.
+- Fotos de mascotas, recuperación de contraseña, verificación de correo, notificaciones por correo/WhatsApp, pagos y mapas no forman parte de esta entrega. Ver riesgos en [docs/roles.md](docs/roles.md).
+- Para un despliegue público se requiere HTTPS, `COOKIE_SECURE=true`, dominio exacto en CORS, secretos nuevos, copias de seguridad y una revisión de seguridad. Hay límite de intentos de inicio de sesión (por proceso, no distribuido); no hay autenticación multifactor. Ver [docs/seguridad.md](docs/seguridad.md).
 
 Ver [decisiones del modelo](docs/architecture.md), [contratos REST](docs/api.md), [Sprint 1](docs/sprint-1.md) y [verificación real](docs/verification.md).
 

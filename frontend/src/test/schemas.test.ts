@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { appointmentSchema, petSchema, registerSchema } from '../lib/schemas'
+import { appointmentSchema, clinicSchema, movementSchema, petSchema, registerSchema } from '../lib/schemas'
 
 const account = { first_name: 'Ana', last_name: 'Torres', email: 'ana@example.com', phone: '987654321', password: 'Test-password-123', password_confirmation: 'Test-password-123' }
 const pet = { name: 'Luna', species: 'Gato', breed: 'Mestizo', sex: 'Hembra', birth_date: '2022-03-12', weight: 4.5, color: 'Gris', notes: '' }
@@ -17,7 +17,21 @@ describe('Validación de mascota', () => {
   })
 })
 describe('Validación de cita', () => {
-  const appointment = { pet_id: 1, clinic_id: 1, service_id: 1, date: '2099-01-01', time: '10:00', reason: '' }
+  const appointment = { pet_id: 1, clinic_id: 1, service_id: 1, date: '2099-01-01', starts_at: '2099-01-01T10:00:00-05:00', reason: '' }
   it('acepta una cita futura', () => expect(appointmentSchema.safeParse(appointment).success).toBe(true))
-  it.each([{ pet_id: 0 }, { clinic_id: 0 }, { service_id: 0 }, { date: '2000-01-01' }, { date: '2099-02-31' }, { time: '25:61' }])('rechaza una cita inválida: %o', change => expect(appointmentSchema.safeParse({ ...appointment, ...change }).success).toBe(false))
+  it.each([{ pet_id: 0 }, { clinic_id: 0 }, { service_id: 0 }, { date: '2099-02-31' }, { starts_at: '' }, { starts_at: '2000-01-01T10:00:00-05:00' }])('rechaza una cita inválida: %o', change => expect(appointmentSchema.safeParse({ ...appointment, ...change }).success).toBe(false))
+})
+describe('Horario de la veterinaria', () => {
+  const clinic = { name: 'Huella', address: 'Av. Siempre Viva 123', phone: '987654321', opening_hours: 'Lun a sáb', description: 'Veterinaria de barrio.', opens_at: '08:00', closes_at: '20:00', open_days: [1, 2, 3, 4, 5, 6] }
+  it('acepta un horario válido', () => expect(clinicSchema.safeParse(clinic).success).toBe(true))
+  it.each([{ closes_at: '07:00' }, { opens_at: '25:00' }, { open_days: [] }])('rechaza %o', change => expect(clinicSchema.safeParse({ ...clinic, ...change }).success).toBe(false))
+})
+describe('Movimientos de inventario', () => {
+  it('un ingreso debe ser positivo y un ajuste distinto de cero', () => {
+    expect(movementSchema.safeParse({ kind: 'Ingreso', quantity: 5 }).success).toBe(true)
+    expect(movementSchema.safeParse({ kind: 'Ingreso', quantity: -1 }).success).toBe(false)
+    expect(movementSchema.safeParse({ kind: 'Ajuste', quantity: -3, notes: 'Vencido' }).success).toBe(true)
+    expect(movementSchema.safeParse({ kind: 'Ajuste', quantity: -3 }).success).toBe(false)
+    expect(movementSchema.safeParse({ kind: 'Ajuste', quantity: 0 }).success).toBe(false)
+  })
 })

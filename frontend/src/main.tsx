@@ -4,7 +4,12 @@ import { BrowserRouter } from 'react-router-dom'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import App from './App'
 import { ApiError } from './lib/api'
+import { applyPrefs, installBreakpointEmulation, loadPrefs } from './lib/a11y'
 import './styles.css'
+
+// Apply reading preferences before the first paint to avoid a flash of the default size.
+applyPrefs(loadPrefs())
+installBreakpointEmulation()
 
 const client = new QueryClient({ defaultOptions: { queries: { staleTime: 30_000, retry: (count, error) => !(error instanceof ApiError && error.status >= 400 && error.status < 500) && count < 1 }, mutations: { retry: false } } })
 class ErrorBoundary extends Component<{ children: ReactNode }, { failed: boolean }> {

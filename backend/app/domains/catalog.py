@@ -10,7 +10,7 @@ router = APIRouter(tags=["Veterinarias y servicios"])
 
 @router.get("/clinics", response_model=list[ClinicOut])
 def list_clinics(user: CurrentUser, db: Db, search: str = Query(default="", max_length=120)):
-    query = select(VeterinaryClinic)
+    query = select(VeterinaryClinic).where(VeterinaryClinic.is_active.is_(True))
     if search.strip():
         query = query.where(VeterinaryClinic.name.icontains(search.strip(), autoescape=True))
     return db.scalars(query.order_by(VeterinaryClinic.name)).all()
@@ -19,14 +19,15 @@ def list_clinics(user: CurrentUser, db: Db, search: str = Query(default="", max_
 @router.get("/clinics/{clinic_id}", response_model=ClinicOut)
 def get_clinic(clinic_id: int, user: CurrentUser, db: Db):
     clinic = db.get(VeterinaryClinic, clinic_id)
-    if not clinic:
+    if not clinic or not clinic.is_active:
         raise HTTPException(404, "No encontramos esa veterinaria.")
     return clinic
 
 
 @router.get("/services", response_model=list[ServiceOut])
 def list_services(user: CurrentUser, db: Db, clinic_id: int | None = Query(default=None, gt=0)):
-    query = select(VeterinaryService)
+    query = select(VeterinaryService).join(VeterinaryClinic).where(
+        VeterinaryService.is_active.is_(True), VeterinaryClinic.is_active.is_(True))
     if clinic_id is not None:
         query = query.where(VeterinaryService.clinic_id == clinic_id)
     return db.scalars(query.order_by(VeterinaryService.name)).all()

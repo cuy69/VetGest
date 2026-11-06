@@ -3,11 +3,13 @@ from datetime import UTC, datetime
 from fastapi import APIRouter, HTTPException
 from sqlalchemy import select
 
-from app.core.security import CurrentUser, Db
+from app.core.security import Db, Owner
+from app.domains.history import pet_history
 from app.models import Appointment, Pet
-from app.schemas import PetInput, PetOut
+from app.schemas import HistoryOut, PetInput, PetOut
 
 router = APIRouter(prefix="/pets", tags=["Mascotas"])
+OPEN_STATUSES = ("Pendiente", "Confirmada")
 
 
 def owned_pet(db, owner_id: int, pet_id: int, lock: bool = False) -> Pet:
@@ -19,12 +21,12 @@ def owned_pet(db, owner_id: int, pet_id: int, lock: bool = False) -> Pet:
 
 
 @router.get("", response_model=list[PetOut])
-def list_pets(user: CurrentUser, db: Db):
+def list_pets(user: Owner, db: Db):
     return db.scalars(select(Pet).where(Pet.owner_id == user.profile.id, Pet.deleted_at.is_(None)).order_by(Pet.created_at.desc())).all()
 
 
 @router.post("", response_model=PetOut, status_code=201)
-def create_pet(data: PetInput, user: CurrentUser, db: Db):
+def create_pet(data: PetInput, user: Owner, db: Db):
     pet = Pet(owner_id=user.profile.id, **data.model_dump())
     db.add(pet)
     db.commit()
@@ -32,12 +34,17 @@ def create_pet(data: PetInput, user: CurrentUser, db: Db):
 
 
 @router.get("/{pet_id}", response_model=PetOut)
-def get_pet(pet_id: int, user: CurrentUser, db: Db):
+def get_pet(pet_id: int, user: Owner, db: Db):
     return owned_pet(db, user.profile.id, pet_id)
 
 
+@router.get("/{pet_id}/history", response_model=HistoryOut)
+def get_pet_history(pet_id: int, user: Owner, db: Db):
+    return pet_history(db, owned_pet(db, user.profile.id, pet_id).id)
+
+
 @router.put("/{pet_id}", response_model=PetOut)
-def update_pet(pet_id: int, data: PetInput, user: CurrentUser, db: Db):
+def update_pet(pet_id: int, data: PetInput, user: Owner, db: Db):
     pet = owned_pet(db, user.profile.id, pet_id, lock=True)
     for key, value in data.model_dump().items():
         setattr(pet, key, value)
@@ -46,10 +53,10 @@ def update_pet(pet_id: int, data: PetInput, user: CurrentUser, db: Db):
 
 
 @router.delete("/{pet_id}", status_code=204)
-def delete_pet(pet_id: int, user: CurrentUser, db: Db):
+def delete_pet(pet_id: int, user: Owner, db: Db):
     pet = owned_pet(db, user.profile.id, pet_id, lock=True)
-    pending = db.scalar(select(Appointment.id).where(Appointment.pet_id == pet.id, Appointment.status == "Pendiente").limit(1))
+    pending = db.scalar(select(Appointment.id).where(Appointment.pet_id == pet.id, Appointment.status.in_(OPEN_STATUSES)).limit(1))
     if pending:
-        raise HTTPException(409, "Cancela las citas pendientes de esta mascota antes de eliminarla.")
+        raise HTTPException(409, "Cancela las citas pendientes o confirmadas de esta mascota antes de eliminarla.")
     pet.deleted_at = datetime.now(UTC)
     db.commit()

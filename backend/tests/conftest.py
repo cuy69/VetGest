@@ -12,6 +12,7 @@ os.environ.setdefault("JWT_SECRET", "isolated-test-secret-not-for-production-123
 os.environ.setdefault("CORS_ORIGINS", '["http://testserver"]')
 
 from app.core.database import get_db  # noqa: E402
+from app.domains.auth import failed_logins  # noqa: E402
 from app.main import app  # noqa: E402
 from app.models import VeterinaryClinic, VeterinaryService  # noqa: E402
 
@@ -44,6 +45,7 @@ def db(test_engine):
 
 @pytest.fixture()
 def client(db):
+    failed_logins.clear()  # lockouts are per process; keep tests independent
     with TestClient(app) as test_client:
         yield test_client
 

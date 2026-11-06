@@ -1,0 +1,34 @@
+# Blueprint de Render: solo la API (Docker). La web se publica en Vercel (frontend/vercel.json)
+# y la base de datos vive en Supabase.
+# Los valores con sync: false se completan en el panel de Render; nunca se versionan.
+services:
+  - type: web
+    name: vetgest-api
+    runtime: docker
+    plan: free
+    region: ohio # cerca del proyecto Supabase «Veterinaria» (us-east-2)
+    dockerContext: ./backend
+    dockerfilePath: ./backend/Dockerfile
+    healthCheckPath: /api/health
+    envVars:
+      - key: PORT
+        value: "8000"
+      - key: DATABASE_URL
+        sync: false # Supabase → Connect → Session pooler (puerto 5432, IPv4)
+      - key: MIGRATION_DATABASE_URL
+        sync: false # opcional: usuario dueño (postgres) para migraciones; DATABASE_URL pasa a vetgest_app
+      - key: JWT_SECRET
+        generateValue: true
+      - key: COOKIE_SECURE
+        value: "true"
+      - key: CORS_ORIGINS
+        sync: false # dominio exacto de la web en Vercel, p. ej. ["https://vetgest.vercel.app"]
+      - key: MOBILE_TOKEN_DAYS
+        value: "30" # duración del token de la app móvil
+      - key: SEED_DEMO_CATALOG
+        value: "false"
+      - key: BOOTSTRAP_ADMIN_EMAIL
+        sync: false
+      - key: BOOTSTRAP_ADMIN_PASSWORD
+        sync: false
+

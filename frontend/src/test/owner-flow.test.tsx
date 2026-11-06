@@ -8,7 +8,7 @@ import App from '../App'
 // Contract-level UI test. The separate Playwright flow uses the actual API/database.
 it('registra al propietario, lo dirige al login y permite registrar su mascota', async () => {
   const user = userEvent.setup()
-  const owner = { id: 1, email: 'ana@example.com', profile: { first_name: 'Ana', last_name: 'Torres', phone: '987654321' } }
+  const owner = { id: 1, email: 'ana@example.com', role: 'owner', must_change_password: false, membership: null, profile: { first_name: 'Ana', last_name: 'Torres', phone: '987654321' } }
   let registered = false
   let authenticated = false
   let pet: Record<string, unknown> | null = null
@@ -23,7 +23,8 @@ it('registra al propietario, lo dirige al login y permite registrar su mascota',
     else if (path === '/api/pets' && method === 'POST') { expect(authenticated).toBe(true); pet = { ...JSON.parse(String(init?.body)), id: 10, created_at: '2026-01-01T00:00:00Z', updated_at: '2026-01-01T00:00:00Z' }; body = pet; status = 201 }
     else if (path === '/api/pets') body = pet ? [pet] : []
     else if (path === '/api/pets/10') body = pet
-    else if (path === '/api/appointments') body = []
+    else if (path === '/api/appointments' || path === '/api/reminders') body = []
+    else if (path === '/api/pets/10/history') body = { records: [], care: [] }
     else throw new Error(`Unexpected request: ${method} ${path}`)
     return new Response(JSON.stringify(body), { status, headers: { 'Content-Type': 'application/json' } })
   })

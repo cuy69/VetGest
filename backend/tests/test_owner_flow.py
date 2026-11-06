@@ -1,4 +1,5 @@
-from datetime import UTC, datetime, timedelta
+from datetime import UTC, datetime, time, timedelta
+from zoneinfo import ZoneInfo
 
 import jwt
 import pytest
@@ -12,6 +13,19 @@ from app.models import User
 
 PASSWORD = "Test-password-123"
 PET = {"name": "Luna", "species": "Gato", "breed": "Mestizo", "sex": "Hembra", "birth_date": "2022-03-12", "weight": 4.5, "color": "Gris", "notes": "Es tranquila."}
+
+
+def lima_today():
+    """Business date in Lima: the API validates dates there, not in the container's UTC."""
+    return datetime.now(ZoneInfo("America/Lima")).date()
+
+
+def slot(days: int = 2, hour: int = 10, minute: int = 0) -> str:
+    """A future time inside the default clinic hours (Monday to Saturday, 09:00–18:00, Lima)."""
+    day = datetime.now(ZoneInfo("America/Lima")).date() + timedelta(days=days)
+    while day.isoweekday() == 7:
+        day += timedelta(days=1)
+    return datetime.combine(day, time(hour, minute), ZoneInfo("America/Lima")).isoformat()
 
 
 def register(client, email="ana@example.com"):
@@ -32,7 +46,7 @@ def make_appointment(client, catalog, **overrides):
     pet = client.post("/api/pets", json=PET)
     assert pet.status_code == 201
     data = {"pet_id": pet.json()["id"], "clinic_id": first.id, "service_id": service.id,
-            "starts_at": (datetime.now(UTC) + timedelta(days=2)).isoformat(), "reason": "Control preventivo"}
+            "starts_at": slot(2), "reason": "Control preventivo"}
     return client.post("/api/appointments", json=data | overrides)
 
 
@@ -66,6 +80,29 @@ def test_login_correct_incorrect_and_logout_revokes_token(client):
     assert client.get("/api/auth/me").status_code == 401
     client.cookies.set("vetgest_session", token, path="/api")
     assert client.get("/api/auth/me").status_code == 401
+
+
+def test_login_locks_after_repeated_failures(client):
+    register(client)
+    wrong = {"email": "ANA@example.com", "password": "wrong-password"}
+    for _ in range(5):
+        assert client.post("/api/auth/login", json=wrong).status_code == 401
+    # Even the right password is refused during the lockout, on the web and in the app.
+    blocked = login(client)
+    assert blocked.status_code == 429 and int(blocked.headers["retry-after"]) > 0
+    assert client.post("/api/auth/token", json={"email": "ana@example.com", "password": PASSWORD}).status_code == 429
+    # Other accounts are not affected.
+    assert client.post("/api/auth/login", json={"email": "otra@example.com", "password": "x"}).status_code == 401
+
+
+def test_successful_login_resets_failure_count(client):
+    register(client)
+    for _ in range(4):
+        client.post("/api/auth/login", json={"email": "ana@example.com", "password": "wrong-password"})
+    assert login(client).status_code == 200
+    for _ in range(4):
+        client.post("/api/auth/login", json={"email": "ana@example.com", "password": "wrong-password"})
+    assert login(client).status_code == 200
 
 
 def test_cookie_flags_and_profile_update(client):
@@ -138,7 +175,7 @@ def test_appointment_create_detail_cancel_and_foreign_owner(client, catalog):
         assert other.get("/api/appointments").json() == []
         assert other.get(f"/api/appointments/{appointment_id}").status_code == 404
         assert other.patch(f"/api/appointments/{appointment_id}/cancel").status_code == 404
-        payload = {"pet_id": pet_id, "clinic_id": catalog[0].id, "service_id": catalog[2].id, "starts_at": (datetime.now(UTC) + timedelta(days=3)).isoformat()}
+        payload = {"pet_id": pet_id, "clinic_id": catalog[0].id, "service_id": catalog[2].id, "starts_at": slot(3)}
         assert other.post("/api/appointments", json=payload).status_code == 404
     assert client.patch(f"/api/appointments/{appointment_id}/cancel").json()["status"] == "Cancelada"
     assert client.patch(f"/api/appointments/{appointment_id}/cancel").status_code == 409
@@ -170,4 +207,5 @@ def test_csrf_origin_rejected_and_openapi_available(client):
     schema = client.get("/api/openapi.json")
     assert schema.status_code == 200
     assert "/api/appointments/{appointment_id}/cancel" in schema.json()["paths"]
+    assert "/api/clinic/patients/{pet_id}/records" in schema.json()["paths"]
     assert client.get("/api/docs").status_code == 200

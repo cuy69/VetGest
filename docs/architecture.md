@@ -39,6 +39,8 @@ Las respuestas de cuenta nunca incluyen hash, versión de sesión ni token. Los 
 
 ## Límites explícitos
 
-No se calcula disponibilidad por profesional, no se previenen solapamientos entre solicitudes y no se confirma la atención. Una solicitud puede estar fuera del horario informativo; la UI lo presenta como propuesta sin reserva. La validación obligatoria es que la fecha/hora sea futura. Sin este límite, sería necesario modelar turnos, personal y capacidad, fuera de US07.
+> **Actualizado (noviembre de 2026, rama `feature/despliegue-y-app`).** El párrafo original del Sprint 1 decía que no se calculaba disponibilidad. Ahora sí: ver «Horarios disponibles» en [roles.md](roles.md). La sesión acepta además un token Bearer para la app móvil de propietarios (ver [api.md](api.md)).
 
-El uso local por Compose es el objetivo de despliegue. No se reemplazó FastAPI/PostgreSQL por un backend de hosting de Sites. La guía de Sites se usó para el diseño del frontend, respetando el stack solicitado.
+Sprint 1 (histórico): no se calculaba disponibilidad por profesional, no se prevenían solapamientos entre solicitudes y no se confirmaba la atención.
+
+El uso local por Compose fue el objetivo del Sprint 1; el despliegue actual (Supabase + Render + Vercel) está en [deploy.md](deploy.md). No se reemplazó FastAPI/PostgreSQL por un backend de hosting de Sites. La guía de Sites se usó para el diseño del frontend, respetando el stack solicitado.
