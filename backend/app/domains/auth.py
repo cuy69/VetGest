@@ -1,3 +1,4 @@
+import time
 from datetime import timedelta
 
 from fastapi import APIRouter, HTTPException, Response
@@ -33,11 +34,31 @@ def register(data: RegisterInput, db: Db):
     return user
 
 
+LOGIN_MAX_FAILURES = 5
+LOGIN_WINDOW_SECONDS = 15 * 60
+# shortcut: counters live in this process (Render runs one); move them to PostgreSQL or Redis
+# if the API ever runs several instances or workers.
+failed_logins: dict[str, list[float]] = {}
+
+
 def authenticate(db, data: LoginInput) -> User:
-    user = db.scalar(select(User).where(User.email == str(data.email).lower()))
+    # Keyed by email, not IP: behind Vercel and Render the client IP can be spoofed via X-Forwarded-For.
+    email = str(data.email).lower()
+    now = time.monotonic()
+    recent = [t for t in failed_logins.get(email, ()) if now - t < LOGIN_WINDOW_SECONDS]
+    if len(recent) >= LOGIN_MAX_FAILURES:
+        wait = int(LOGIN_WINDOW_SECONDS - (now - recent[0])) + 1
+        raise HTTPException(429, f"Demasiados intentos fallidos. Inténtalo de nuevo en {(wait + 59) // 60} minutos.",
+                            headers={"Retry-After": str(wait)})
+    user = db.scalar(select(User).where(User.email == email))
     valid = password_hash.verify(data.password, user.password_hash if user else dummy_hash)
     if not user or not valid:
+        if len(failed_logins) > 10_000:  # bound memory against floods of random emails
+            for key in [k for k, v in failed_logins.items() if now - v[-1] >= LOGIN_WINDOW_SECONDS]:
+                del failed_logins[key]
+        failed_logins[email] = [*recent, now]
         raise HTTPException(401, "El correo o la contraseña son incorrectos.")
+    failed_logins.pop(email, None)
     if not can_sign_in(user):
         raise HTTPException(403, "Tu cuenta o tu veterinaria está desactivada. Contacta a su administrador.")
     return user

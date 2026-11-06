@@ -34,6 +34,8 @@ async def security_headers_and_origin(request: Request, call_next):
     response.headers["X-Content-Type-Options"] = "nosniff"
     response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
     response.headers["Cache-Control"] = "no-store"
+    if settings.cookie_secure:  # only behind HTTPS (Render); local HTTP must keep working
+        response.headers["Strict-Transport-Security"] = "max-age=31536000; includeSubDomains"
     return response
 
 

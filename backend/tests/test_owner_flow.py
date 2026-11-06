@@ -82,6 +82,29 @@ def test_login_correct_incorrect_and_logout_revokes_token(client):
     assert client.get("/api/auth/me").status_code == 401
 
 
+def test_login_locks_after_repeated_failures(client):
+    register(client)
+    wrong = {"email": "ANA@example.com", "password": "wrong-password"}
+    for _ in range(5):
+        assert client.post("/api/auth/login", json=wrong).status_code == 401
+    # Even the right password is refused during the lockout, on the web and in the app.
+    blocked = login(client)
+    assert blocked.status_code == 429 and int(blocked.headers["retry-after"]) > 0
+    assert client.post("/api/auth/token", json={"email": "ana@example.com", "password": PASSWORD}).status_code == 429
+    # Other accounts are not affected.
+    assert client.post("/api/auth/login", json={"email": "otra@example.com", "password": "x"}).status_code == 401
+
+
+def test_successful_login_resets_failure_count(client):
+    register(client)
+    for _ in range(4):
+        client.post("/api/auth/login", json={"email": "ana@example.com", "password": "wrong-password"})
+    assert login(client).status_code == 200
+    for _ in range(4):
+        client.post("/api/auth/login", json={"email": "ana@example.com", "password": "wrong-password"})
+    assert login(client).status_code == 200
+
+
 def test_cookie_flags_and_profile_update(client):
     register(client)
     result = login(client)
