@@ -46,6 +46,7 @@ SERVICES = [
 
 def seed():
     lock_down_data_api()
+    grant_app_role()
     if get_settings().seed_demo_catalog:
         seed_catalog()
     bootstrap_admin()
@@ -70,6 +71,34 @@ def lock_down_data_api():
         db.execute(text(f"REVOKE ALL ON ALL SEQUENCES IN SCHEMA public FROM {grantees}"))
         db.execute(text(f"REVOKE EXECUTE ON ALL FUNCTIONS IN SCHEMA public FROM {grantees}"))
     print(f"Data API bloqueada para {grantees} en {len(tables)} tablas.")
+
+
+APP_ROLE = "vetgest_app"
+
+
+def grant_app_role():
+    """Least privilege for the running API (docs/administracion-bd.md). If the role exists,
+    it gets read/insert/update on the data but no DELETE, TRUNCATE or DDL: clinical records
+    are never hard-deleted, and a compromised API cannot drop or empty tables. Migrations and
+    this seed keep running as the owner (MIGRATION_DATABASE_URL). Idempotent, so tables from
+    future migrations are covered on the next start.
+    """
+    with SessionLocal.begin() as db:
+        if not db.scalar(text("SELECT 1 FROM pg_roles WHERE rolname = :role"), {"role": APP_ROLE}):
+            return
+        db.execute(text(f"GRANT USAGE ON SCHEMA public TO {APP_ROLE}"))
+        db.execute(text(f"GRANT SELECT, INSERT, UPDATE ON ALL TABLES IN SCHEMA public TO {APP_ROLE}"))
+        db.execute(text(f"REVOKE DELETE, TRUNCATE, REFERENCES, TRIGGER ON ALL TABLES IN SCHEMA public FROM {APP_ROLE}"))
+        db.execute(text(f"REVOKE INSERT, UPDATE ON public.alembic_version FROM {APP_ROLE}"))
+        db.execute(text(f"GRANT USAGE, SELECT ON ALL SEQUENCES IN SCHEMA public TO {APP_ROLE}"))
+        # RLS (enabled by lock_down_data_api on Supabase) hides every row from non-owners without a policy.
+        tables = db.scalars(text(
+            "SELECT tablename FROM pg_tables t WHERE schemaname = 'public' AND tablename <> 'alembic_version' "
+            "AND NOT EXISTS (SELECT 1 FROM pg_policies p WHERE p.schemaname = 'public' "
+            "AND p.tablename = t.tablename AND p.policyname = 'vetgest_app_access')")).all()
+        for table in tables:
+            db.execute(text(f'CREATE POLICY vetgest_app_access ON public."{table}" TO {APP_ROLE} USING (true) WITH CHECK (true)'))
+    print(f"Permisos mínimos aplicados a {APP_ROLE}.")
 
 
 def seed_catalog():

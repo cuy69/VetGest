@@ -3,7 +3,7 @@ from sqlalchemy import text
 from sqlalchemy.exc import ProgrammingError
 
 from app.core.config import Settings
-from app.seed import lock_down_data_api
+from app.seed import grant_app_role, lock_down_data_api
 
 
 def test_supabase_data_api_cannot_read_tables(test_engine):
@@ -20,6 +20,24 @@ def test_supabase_data_api_cannot_read_tables(test_engine):
         conn.execute(text("SET ROLE anon"))
         with pytest.raises(ProgrammingError):
             conn.execute(text("SELECT password_hash FROM users"))
+        conn.rollback()
+
+
+def test_app_role_reads_and_writes_but_cannot_delete_or_alter(test_engine):
+    with test_engine.begin() as conn:
+        conn.execute(text("DO $$ BEGIN CREATE ROLE vetgest_app NOLOGIN; EXCEPTION WHEN duplicate_object THEN NULL; END $$"))
+        conn.execute(text("ALTER TABLE veterinary_clinics ENABLE ROW LEVEL SECURITY"))  # as on Supabase
+        owner_sees = conn.scalar(text("SELECT count(*) FROM veterinary_clinics"))
+    grant_app_role()
+    with test_engine.connect() as conn:
+        conn.execute(text("SET ROLE vetgest_app"))
+        assert conn.scalar(text("SELECT count(*) FROM veterinary_clinics")) == owner_sees  # policy lets rows through
+        conn.execute(text("UPDATE veterinary_clinics SET phone = phone"))
+        for statement in ("DELETE FROM pets", "TRUNCATE payments", "DROP TABLE pets", "CREATE TABLE intruder (id int)"):
+            with pytest.raises(ProgrammingError):
+                conn.execute(text(statement))
+            conn.rollback()
+            conn.execute(text("SET ROLE vetgest_app"))
         conn.rollback()
 
 

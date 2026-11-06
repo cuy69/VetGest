@@ -15,6 +15,8 @@ services:
         value: "8000"
       - key: DATABASE_URL
         sync: false # Supabase → Connect → Session pooler (puerto 5432, IPv4)
+      - key: MIGRATION_DATABASE_URL
+        sync: false # opcional: usuario dueño (postgres) para migraciones; DATABASE_URL pasa a vetgest_app
       - key: JWT_SECRET
         generateValue: true
       - key: COOKIE_SECURE

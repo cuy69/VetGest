@@ -7,7 +7,9 @@ RUN useradd --create-home vetgest
 COPY --chown=vetgest:vetgest . .
 USER vetgest
 EXPOSE 8000
-CMD ["sh", "-c", "alembic upgrade head && python -m app.seed && uvicorn app.main:app --host 0.0.0.0 --port 8000"]
+# Migrations and seed run as the table owner (MIGRATION_DATABASE_URL, optional); the API itself
+# uses DATABASE_URL, which may be the least-privilege role vetgest_app (docs/administracion-bd.md).
+CMD ["sh", "-c", "DATABASE_URL=\"${MIGRATION_DATABASE_URL:-$DATABASE_URL}\" alembic upgrade head && DATABASE_URL=\"${MIGRATION_DATABASE_URL:-$DATABASE_URL}\" python -m app.seed && exec uvicorn app.main:app --host 0.0.0.0 --port 8000"]
 
 FROM base AS test
 ENV RUFF_CACHE_DIR=/tmp/ruff-cache PYTEST_ADDOPTS="-o cache_dir=/tmp/pytest-cache"
