@@ -1,18 +1,20 @@
 import { useState } from 'react'
-import { View } from 'react-native'
+import { Image, View } from 'react-native'
 import { router, useLocalSearchParams } from 'expo-router'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
-import { Icon } from '@/components/Icon'
 import { Button, Card, ErrorState, Field, Notice, Screen, T } from '@/components/ui'
 import { useAuth } from '@/lib/auth'
 import { loginSchema, validate, type FieldErrors, type LoginValues } from '@/lib/schemas'
 import { space, useTheme } from '@/theme'
-import { group } from '@/lib/a11y'
+import { group, hidden } from '@/lib/a11y'
+import { usePrefs } from '@/lib/prefs'
 
 export default function Login() {
   const { signIn, notice } = useAuth()
   const theme = useTheme()
   const insets = useSafeAreaInsets()
+  // Con texto grande, la marca y «Accesibilidad» no caben en una fila: se apilan.
+  const stacked = usePrefs().prefs.text >= 1.4
   const params = useLocalSearchParams<{ registrado?: string }>()
   const [values, setValues] = useState<LoginValues>({ email: '', password: '' })
   const [errors, setErrors] = useState<FieldErrors<LoginValues>>({})
@@ -33,11 +35,14 @@ export default function Login() {
   return <Screen>
     <View style={{ paddingTop: insets.top + space.lg, gap: space.xl }}>
       <View style={{ gap: space.md }}>
-        <View style={{ flexDirection: 'row', alignItems: 'center', gap: space.sm }} {...group('VetGest')}>
-          <View style={{ width: 44, height: 44, borderRadius: 12, backgroundColor: theme.accent, alignItems: 'center', justifyContent: 'center' }}><Icon name="pets" size={24} color={theme.onAccent} /></View>
-          <T variant="heading" color={theme.primary}>VetGest</T>
+        <View style={{ flexDirection: stacked ? 'column' : 'row', alignItems: stacked ? 'flex-start' : 'center', justifyContent: 'space-between', gap: space.sm }}>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: space.sm }} {...group('VetGest')}>
+            <Image source={require('../../assets/images/icon.png')} style={{ width: 48, height: 48, borderRadius: 14 }} {...hidden} />
+            <T variant="heading" color={theme.primary}>VetGest</T>
+          </View>
+          <Button label="Accesibilidad" icon="a11y" variant="ghost" compact onPress={() => router.push('/accesibilidad')} accessibilityHint="Tamaño del texto, contraste y tema" />
         </View>
-        <T variant="eyebrow">Bienvenido a su nuevo espacio</T>
+        <T variant="eyebrow">Tu veterinaria, en tu bolsillo</T>
         <T variant="title">Qué bueno verte de nuevo.</T>
         <T variant="muted">Tus compañeros y sus próximos cuidados te esperan.</T>
       </View>

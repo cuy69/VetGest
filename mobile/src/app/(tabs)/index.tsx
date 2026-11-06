@@ -1,7 +1,7 @@
 import { FlatList, Pressable, View } from 'react-native'
 import { router } from 'expo-router'
 import { Icon } from '@/components/Icon'
-import { Button, Card, EmptyState, ErrorState, Header, InfoLine, Loading, PetAvatar, Pill, Screen, SectionTitle, StageTimeline, T } from '@/components/ui'
+import { Button, Card, EmptyState, ErrorState, Hero, InfoLine, Loading, PetAvatar, Pill, Screen, SectionTitle, StageTimeline, T } from '@/components/ui'
 import { isLive, nextAppointment, ownerText } from '@/lib/appointments'
 import { useAuth } from '@/lib/auth'
 import { longDate, updatedAgo, when } from '@/lib/format'
@@ -31,8 +31,9 @@ export default function Home() {
   }
 
   return <Screen onRefresh={refresh} refreshing={refreshing}>
-    <Header eyebrow="Cada día, un poco más de cuidado" title={`Hola, ${user?.profile.first_name ?? ''}`} description="Qué pasa con tus mascotas, de un vistazo." />
-    <Button label="Pedir turno" icon="add" onPress={() => router.push('/citas/nueva')} />
+    <Hero eyebrow="Cada día, un poco más de cuidado" title={`Hola, ${user?.profile.first_name ?? ''}`} description="Qué pasa con tus mascotas, de un vistazo.">
+      <Button label="Pedir turno" icon="add" variant="accent" onPress={() => router.push('/citas/nueva')} style={{ marginTop: space.sm }} />
+    </Hero>
 
     {/* 1. Próxima cita */}
     <SectionTitle title="Próxima cita" action={<Button label="Mis citas" variant="ghost" compact onPress={() => router.navigate('/citas')} />} />
@@ -47,14 +48,14 @@ export default function Home() {
         </View>
         <T variant="subheading" style={tabular}>{when(next.starts_at)}</T>
         <InfoLine icon="pin">{next.clinic.name}</InfoLine>
-        <View style={{ backgroundColor: theme.soft, borderRadius: 14, padding: space.md }}>
-          <T style={{ fontWeight: '700' }} accessibilityLiveRegion="polite">{ownerText(next)}</T>
+        <View style={{ backgroundColor: theme.accentSoft, borderRadius: 14, padding: space.md }}>
+          <T color={theme.onAccentSoft} style={{ fontWeight: '700' }} accessibilityLiveRegion="polite">{ownerText(next)}</T>
         </View>
         <StageTimeline appointment={next} />
         <T variant="small">{updatedAgo(appointments.dataUpdatedAt, now)} · se actualiza cada 30 s</T>
         <Button label="Ver mi turno" variant="secondary" onPress={() => router.push({ pathname: '/citas/[id]', params: { id: String(next.id) } })} />
       </Card>
-    ) : <EmptyState icon="calendar" title="No tienes turnos próximos" action={<Button label="Pedir turno" icon="add" onPress={() => router.push('/citas/nueva')} />}>Pide un turno y sigue aquí su estado en vivo.</EmptyState>}
+    ) : <EmptyState icon="calendar" title="No tienes turnos próximos">Pide un turno con el botón de arriba y sigue aquí su estado en vivo.</EmptyState>}
 
     {/* 2. Recordatorios: la palanca de retorno */}
     <SectionTitle title="Recordatorios" />

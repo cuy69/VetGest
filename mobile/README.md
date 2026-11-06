@@ -56,6 +56,8 @@ src/app/            rutas (expo-router)
   veterinarias.tsx, veterinaria/[id].tsx    catálogo y servicios
   ingresar.tsx, registro.tsx
 src/components/     UI accesible (ui.tsx), selector de días y turnos, iconos Lucide
+src/lib/prefs.tsx   preferencias de accesibilidad (tema, tamaño, contraste, negrita, espaciado, animaciones)
+assets/icon-source/ fuente del ícono de la app (regenera los PNG de assets/images)
 src/lib/            cliente API, sesión, consultas, validaciones (copiadas de la web), formatos
 __tests__/          pruebas jest-expo
 ```

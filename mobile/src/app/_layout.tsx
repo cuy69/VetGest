@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { Nunito_400Regular, Nunito_600SemiBold, Nunito_700Bold, Nunito_800ExtraBold, useFonts } from '@expo-google-fonts/nunito'
 import { DarkTheme, DefaultTheme, Stack, ThemeProvider } from 'expo-router'
 import * as SplashScreen from 'expo-splash-screen'
 import { StatusBar } from 'expo-status-bar'
@@ -8,7 +9,8 @@ import { ApiError } from '@/lib/api'
 import { AuthProvider, useAuth } from '@/lib/auth'
 import { View } from 'react-native'
 import { Loading, ServerWakeBanner } from '@/components/ui'
-import { useTheme } from '@/theme'
+import { PrefsProvider, useReduceMotion } from '@/lib/prefs'
+import { useTheme, useType } from '@/theme'
 
 void SplashScreen.preventAutoHideAsync().catch(() => undefined)
 
@@ -27,17 +29,21 @@ function makeClient() {
 function RootNavigator() {
   const { status } = useAuth()
   const theme = useTheme()
-  // La pantalla de arranque se oculta enseguida: si la API está dormida, se ve «Despertando el servidor…».
-  useEffect(() => { void SplashScreen.hideAsync().catch(() => undefined) }, [])
+  const type = useType()
+  const reduceMotion = useReduceMotion()
   if (status === 'loading') return <View style={{ flex: 1, justifyContent: 'center', backgroundColor: theme.background }}><Loading label="Abriendo VetGest…" /></View>
   const signedIn = status === 'signedIn'
   const navTheme = theme.scheme === 'dark' ? DarkTheme : DefaultTheme
   return <ThemeProvider value={{ ...navTheme, colors: { ...navTheme.colors, primary: theme.primary, background: theme.background, card: theme.card, text: theme.text, border: theme.border } }}>
     <StatusBar style={theme.scheme === 'dark' ? 'light' : 'dark'} />
     <Stack screenOptions={{
-      headerStyle: { backgroundColor: theme.card }, headerTintColor: theme.primary, headerTitleStyle: { color: theme.text },
+      headerStyle: { backgroundColor: theme.background }, headerShadowVisible: false, headerTintColor: theme.primary,
+      headerTitleStyle: { color: theme.text, fontFamily: type(17, 800).fontFamily, fontSize: type(17, 800).fontSize },
       headerBackButtonDisplayMode: 'minimal', contentStyle: { backgroundColor: theme.background },
+      animation: reduceMotion ? 'none' : 'default',
     }}>
+      {/* Disponible con o sin sesión: ajustar la lectura antes de ingresar. */}
+      <Stack.Screen name="accesibilidad" options={{ title: 'Accesibilidad' }} />
       <Stack.Protected guard={!signedIn}>
         <Stack.Screen name="ingresar" options={{ headerShown: false, title: 'Ingresar' }} />
         <Stack.Screen name="registro" options={{ title: 'Crear cuenta' }} />
@@ -59,9 +65,17 @@ function RootNavigator() {
 
 export default function RootLayout() {
   const [client] = useState(makeClient)
+  const [fontsLoaded, fontError] = useFonts({ Nunito_400Regular, Nunito_600SemiBold, Nunito_700Bold, Nunito_800ExtraBold })
+  const fontsDone = fontsLoaded || !!fontError
+  // La pantalla de arranque espera a la fuente (o a su error: entonces se usa la del sistema).
+  // Si la API está dormida, después se ve «Despertando el servidor…».
+  useEffect(() => { if (fontsDone) void SplashScreen.hideAsync().catch(() => undefined) }, [fontsDone])
+  if (!fontsDone) return null
   return <SafeAreaProvider>
-    <QueryClientProvider client={client}>
-      <AuthProvider><RootNavigator /></AuthProvider>
-    </QueryClientProvider>
+    <PrefsProvider fontsReady={fontsLoaded}>
+      <QueryClientProvider client={client}>
+        <AuthProvider><RootNavigator /></AuthProvider>
+      </QueryClientProvider>
+    </PrefsProvider>
   </SafeAreaProvider>
 }

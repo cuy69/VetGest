@@ -11,7 +11,7 @@
     "preview": {
       "distribution": "internal",
       "android": { "buildType": "apk" },
-      "env": { "EXPO_PUBLIC_API_URL": "https://CAMBIAR-por-tu-backend.onrender.com/api" }
+      "env": { "EXPO_PUBLIC_API_URL": "https://vetgest-api.onrender.com/api" }
     },
     "production": {
       "autoIncrement": true

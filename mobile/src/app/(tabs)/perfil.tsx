@@ -1,7 +1,8 @@
 import { useState } from 'react'
 import { View } from 'react-native'
 import { useMutation } from '@tanstack/react-query'
-import { Button, Card, ErrorState, Field, Header, Notice, Screen, T } from '@/components/ui'
+import { Button, Card, ErrorState, Field, Header, MenuRow, Notice, Screen, T } from '@/components/ui'
+import { router } from 'expo-router'
 import { api } from '@/lib/api'
 import { useAuth } from '@/lib/auth'
 import { profileSchema, validate, type FieldErrors, type ProfileValues } from '@/lib/schemas'
@@ -34,8 +35,8 @@ export default function Profile() {
   return <Screen>
     <Header title="Mi perfil" description="Un espacio para tu información personal." />
     <Card style={{ alignItems: 'center', gap: space.sm }}>
-      <View style={{ width: 72, height: 72, borderRadius: 36, backgroundColor: theme.accent, alignItems: 'center', justifyContent: 'center' }} {...hidden}>
-        <T variant="heading" color={theme.onAccent}>{user.profile.first_name[0]}{user.profile.last_name[0]}</T>
+      <View style={{ width: 72, height: 72, borderRadius: 36, backgroundColor: theme.accentSoft, alignItems: 'center', justifyContent: 'center' }} {...hidden}>
+        <T variant="heading" color={theme.onAccentSoft}>{user.profile.first_name[0]}{user.profile.last_name[0]}</T>
       </View>
       <T variant="heading">{user.profile.first_name} {user.profile.last_name}</T>
       <T variant="muted">Propietario de mascota</T>
@@ -52,6 +53,7 @@ export default function Profile() {
       <Button label="Guardar cambios" icon="check" onPress={submit} loading={mutation.isPending} loadingLabel="Guardando…" disabled={!dirty} />
       <T variant="small">Solo tú puedes consultar y actualizar estos datos. Para cambiar tu contraseña, entra a VetGest desde la web.</T>
     </Card>
+    <MenuRow icon="a11y" label="Accesibilidad" hint="Tamaño del texto, contraste, tema y animaciones" onPress={() => router.push('/accesibilidad')} />
     <Button label="Cerrar sesión" icon="logout" variant="secondary" loading={leaving} loadingLabel="Cerrando sesión…"
       onPress={() => { setLeaving(true); void signOut() }} accessibilityHint="Cierra tu sesión en este dispositivo" />
   </Screen>
